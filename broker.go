@@ -15,6 +15,14 @@ var (
 	rc *redis.Client
 )
 
+func genTaskName(taskID string) string {
+	return "gt:task:" + taskID
+}
+
+func genQueueName(queueName string) string {
+	return "gt:queue:" + queueName
+}
+
 type Broker interface {
 	Acquire(string) *Task
 	Ack(*Task) bool
@@ -23,18 +31,17 @@ type Broker interface {
 }
 
 type RedisBroker struct {
-	TaskTTL   int
-	ResultTTL int
+	TaskTTL int
 }
 
-func UseRedisBroker(redisURL string, taskTTL, resultTTL int) {
+func UseRedisBroker(redisURL string, taskTTL int) {
 	options, err := redis.ParseURL(redisURL)
 	if err != nil {
 		log.Panicf("failed to parse redis URL %s: %s", redisURL, err)
 	}
 
 	rc = redis.NewClient(options)
-	broker = &RedisBroker{taskTTL, resultTTL}
+	broker = &RedisBroker{taskTTL}
 }
 
 func (r *RedisBroker) Acquire(queueName string) *Task {
@@ -62,7 +69,7 @@ func (r *RedisBroker) Update(task *Task) {
 		log.Panicf("failed to enquue task %+v: %s", task, err)
 		return // never executed here
 	}
-	rc.Set(task.ID, taskBytes, time.Duration(r.TaskTTL)*time.Second)
+	rc.Set(genTaskName(task.ID), taskBytes, time.Duration(r.TaskTTL)*time.Second)
 }
 
 func (r *RedisBroker) Enqueue(task *Task) string {
@@ -72,7 +79,7 @@ func (r *RedisBroker) Enqueue(task *Task) string {
 		return "" // never executed here
 	}
 
-	rc.Set(task.ID, taskBytes, time.Duration(r.TaskTTL)*time.Second)
-	rc.LPush(task.QueueName, taskBytes)
+	rc.Set(genTaskName(task.ID), taskBytes, time.Duration(r.TaskTTL)*time.Second)
+	rc.LPush(genQueueName(task.QueueName), taskBytes)
 	return task.ID
 }
