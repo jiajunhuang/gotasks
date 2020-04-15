@@ -8,6 +8,10 @@ In gotasks, we encourage developer to split tasks into smaller pieces(see the de
 - maintain tasks easily
 - split code into reentrant and un-reentrant pieces, so when reentrant part failed, framework will retry it automatically
 
+As handlers are chained, ArgsMap we give will be arguments to the first handler, and ArgsMap in it's return value will
+be arguments to the second handler. If any handler return a error, the execution chain will stop, and record where it
+is now, with the error string inside the task's `result_log` property.
+
 # Usage
 
 ```go
