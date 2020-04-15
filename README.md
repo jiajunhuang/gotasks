@@ -51,6 +51,9 @@ func main() {
 	gotasks.UseRedisBroker(redisURL, 100)
 
 	// enqueue
+    // or you can use a queue:
+    // queue := gotasks.NewQueue(queueName)
+    // queue.Enqueue(uniqueJobName, gotasks.Blablabla...)
 	gotasks.Enqueue(queueName, uniqueJobName, gotasks.MapToArgsMap(map[string]interface{}{})) // or gotasks.StructToArgsMap
 }
 ```
