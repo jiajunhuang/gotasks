@@ -5,6 +5,7 @@ import (
 	"log"
 	"runtime/debug"
 	"sync"
+	"time"
 )
 
 // gotasks is a job/task framework for Golang.
@@ -88,7 +89,21 @@ func run(ctx context.Context, queue string) {
 
 				task.CurrentHandlerIndex = i
 				log.Printf("task %+v is executing step %d with handler %+v", task, task.CurrentHandlerIndex, handler)
-				args, err = handler(args)
+				handlerName := getHandlerName(handler)
+				reentrantOptions, ok := reentrantMap[handlerName]
+				if ok { // check if the handler can retry
+					for j := 0; j < reentrantOptions.MaxTimes; j++ {
+						args, err = handler(args)
+						if err == nil {
+							break
+						}
+						time.Sleep(time.Second * time.Duration(reentrantOptions.SleepySeconds))
+					}
+				} else {
+					args, err = handler(args)
+				}
+
+				// error occurred
 				if err != nil {
 					log.Panicf("failed to execute handler %+v: %s", handler, err)
 				}
