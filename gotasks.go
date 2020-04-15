@@ -1,6 +1,7 @@
 package gotasks
 
 import (
+	"context"
 	"log"
 	"runtime/debug"
 	"sync"
@@ -43,9 +44,18 @@ func Register(jobName string, handlers ...JobHandler) {
 	jobMap[jobName] = handlers
 }
 
-func run(queue string) {
+func run(ctx context.Context, queue string) {
 	for {
+		select {
+		case <-ctx.Done():
+			log.Printf("ctx.Done() received, quit (for queue %s) now", queue)
+			return
+		default:
+			log.Printf("gonna acquire a task from queue %s", queue)
+		}
+
 		task := broker.Acquire(queue)
+
 		if ackWhen == AckWhenAcquired {
 			ok := broker.Ack(task)
 			log.Printf("ack broker of task %+v with status %t", task.ID, ok)
@@ -98,7 +108,7 @@ func Run(queues ...string) {
 	wg := sync.WaitGroup{}
 	for _, queue := range queues {
 		wg.Add(1)
-		go run(queue)
+		go run(context.Background(), queue)
 	}
 
 	wg.Wait()

@@ -46,12 +46,16 @@ func UseRedisBroker(redisURL string, taskTTL int) {
 
 func (r *RedisBroker) Acquire(queueName string) *Task {
 	task := Task{}
-	vs := rc.BRPop(time.Duration(0), queueName).Val()
-	v := []byte(vs[0])
+	vs, err := rc.BRPop(time.Duration(0), genQueueName(queueName)).Result()
+	if err != nil {
+		log.Panicf("failed to get task from redis: %s", err)
+		return nil // never executed
+	}
+	v := []byte(vs[1])
 
 	if err := json.Unmarshal(v, &task); err != nil {
 		log.Panicf("failed to get task from redis: %s", err)
-		return nil
+		return nil // never executed
 	}
 
 	return &task
