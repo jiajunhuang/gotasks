@@ -35,6 +35,7 @@ type Task struct {
 	JobName             string    `json:"job_name"`
 	ArgsMap             ArgsMap   `json:"args_map"`
 	CurrentHandlerIndex int       `json:"current_handler_index"`
+	OriginalArgsMap     ArgsMap   `json:"original_args_map"`
 	ResultLog           string    `json:"result_log"`
 }
 
@@ -42,7 +43,7 @@ func NewTask(queueName, jobName string, argsMap ArgsMap) *Task {
 	u, _ := uuid.NewUUID()
 	now := time.Now()
 
-	task := &Task{u.String(), now, now, queueName, jobName, argsMap, 0, ""}
+	task := &Task{u.String(), now, now, queueName, jobName, argsMap, 0, argsMap, ""}
 
 	return task
 }

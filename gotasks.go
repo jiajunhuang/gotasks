@@ -2,6 +2,8 @@ package gotasks
 
 import (
 	"log"
+	"runtime/debug"
+	"sync"
 )
 
 // gotasks is a job/task framework for Golang.
@@ -16,9 +18,21 @@ import (
 // Note that job will be executed in register order, and every job handle function
 // must have a signature which match gotasks.JobHandler, which receives a ArgsMap and
 // return a ArgsMap which will be arguments input for next handler.
-var (
-	jobMap = map[string][]JobHandler{}
+type AckWhenStatus int
+
+const (
+	AckWhenAcquired AckWhenStatus = iota
+	AckWhenSucceed
 )
+
+var (
+	jobMap  = map[string][]JobHandler{}
+	ackWhen = AckWhenSucceed
+)
+
+func AckWhen(i AckWhenStatus) {
+	ackWhen = i
+}
 
 func Register(jobName string, handlers ...JobHandler) {
 	if _, ok := jobMap[jobName]; ok {
@@ -29,8 +43,65 @@ func Register(jobName string, handlers ...JobHandler) {
 	jobMap[jobName] = handlers
 }
 
-func Run(queues ...string) {
+func run(queue string) {
+	for {
+		task := broker.Acquire(queue)
+		if ackWhen == AckWhenAcquired {
+			ok := broker.Ack(task)
+			log.Printf("ack broker of task %+v with status %t", task.ID, ok)
+		}
 
+		func() {
+			defer func() {
+				if r := recover(); r != nil {
+					task.ResultLog = string(debug.Stack())
+					broker.Update(task)
+					log.Printf("recovered from queue %s and task %+v with recover info %+v", queue, task, r)
+				}
+			}()
+
+			handlers, ok := jobMap[task.JobName]
+			if !ok {
+				log.Panicf("can't find job handlers of %s", task.JobName)
+				return
+			}
+
+			var (
+				err  error
+				args = task.ArgsMap
+			)
+			for i, handler := range handlers {
+				if task.CurrentHandlerIndex > i {
+					log.Printf("skip step %d of task %s because it was executed successfully", i, task.ID)
+					continue
+				}
+
+				task.CurrentHandlerIndex = i
+				log.Printf("task %+v is executing step %d with handler %+v", task, task.CurrentHandlerIndex, handler)
+				args, err = handler(args)
+				if err != nil {
+					log.Panicf("failed to execute handler %+v: %s", handler, err)
+				}
+				task.ArgsMap = args
+				broker.Update(task)
+			}
+		}()
+
+		if ackWhen == AckWhenSucceed {
+			ok := broker.Ack(task)
+			log.Printf("ack broker of task %+v with status %t", task.ID, ok)
+		}
+	}
+}
+
+func Run(queues ...string) {
+	wg := sync.WaitGroup{}
+	for _, queue := range queues {
+		wg.Add(1)
+		go run(queue)
+	}
+
+	wg.Wait()
 }
 
 func Enqueue(queueName, jobName string, argsMap ArgsMap) string {
