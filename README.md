@@ -50,3 +50,7 @@ func main() {
 	gotasks.Enqueue(queueName, uniqueJobName, gotasks.MapToArgsMap(map[string]interface{}{})) // or gotasks.StructToArgsMap
 }
 ```
+
+## License
+
+NOTE that from the first commit, we use a GPL-v3 open source license.
