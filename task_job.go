@@ -2,6 +2,7 @@ package gotasks
 
 import (
 	"log"
+	"time"
 
 	"github.com/google/uuid"
 )
@@ -27,16 +28,21 @@ func MapToArgsMap(v interface{}) ArgsMap {
 }
 
 type Task struct {
-	ID                  string  `json:"task_id"`
-	QueueName           string  `json:"queue_name"`
-	JobName             string  `json:"job_name"`
-	ArgsMap             ArgsMap `json:"args_map"`
-	CurrentHandlerIndex int     `json:"current_handler_index"`
+	ID                  string    `json:"task_id"`
+	CreatedAt           time.Time `json:"created_at"`
+	UpdatedAt           time.Time `json:"updated_at"`
+	QueueName           string    `json:"queue_name"`
+	JobName             string    `json:"job_name"`
+	ArgsMap             ArgsMap   `json:"args_map"`
+	CurrentHandlerIndex int       `json:"current_handler_index"`
+	ResultLog           string    `json:"result_log"`
 }
 
 func NewTask(queueName, jobName string, argsMap ArgsMap) *Task {
 	u, _ := uuid.NewUUID()
-	task := &Task{u.String(), queueName, jobName, argsMap, 0}
+	now := time.Now()
+
+	task := &Task{u.String(), now, now, queueName, jobName, argsMap, 0, ""}
 
 	return task
 }

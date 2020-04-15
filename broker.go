@@ -1,37 +1,78 @@
 package gotasks
 
+import (
+	"log"
+	"time"
+
+	redis "github.com/go-redis/redis/v7"
+)
+
 var (
 	broker Broker
 	_      Broker = &RedisBroker{}
+
+	// rc: RedisClient
+	rc *redis.Client
 )
 
 type Broker interface {
-	Acquire()
-	Ack()
-	Update()
+	Acquire(string) *Task
+	Ack(*Task) bool
+	Update(*Task)
 	Enqueue(*Task) string
 }
 
 type RedisBroker struct {
+	TaskTTL   int
 	ResultTTL int
 }
 
-func NewRedisBroker() *RedisBroker {
-	return nil
+func UseRedisBroker(redisURL string, taskTTL, resultTTL int) {
+	options, err := redis.ParseURL(redisURL)
+	if err != nil {
+		log.Panicf("failed to parse redis URL %s: %s", redisURL, err)
+	}
+
+	rc = redis.NewClient(options)
+	broker = &RedisBroker{taskTTL, resultTTL}
 }
 
-func (r *RedisBroker) Acquire() {
+func (r *RedisBroker) Acquire(queueName string) *Task {
+	task := Task{}
+	vs := rc.BRPop(time.Duration(0), queueName).Val()
+	v := []byte(vs[0])
 
+	if err := json.Unmarshal(v, &task); err != nil {
+		log.Panicf("failed to get task from redis: %s", err)
+		return nil
+	}
+
+	return &task
 }
 
-func (r *RedisBroker) Ack() {
-
+func (r *RedisBroker) Ack(task *Task) bool {
+	// redis doesn't support ACK
+	return true
 }
 
-func (r *RedisBroker) Update() {
-
+func (r *RedisBroker) Update(task *Task) {
+	task.UpdatedAt = time.Now()
+	taskBytes, err := json.Marshal(task)
+	if err != nil {
+		log.Panicf("failed to enquue task %+v: %s", task, err)
+		return // never executed here
+	}
+	rc.Set(task.ID, taskBytes, time.Duration(r.TaskTTL)*time.Second)
 }
 
 func (r *RedisBroker) Enqueue(task *Task) string {
+	taskBytes, err := json.Marshal(task)
+	if err != nil {
+		log.Panicf("failed to enquue task %+v: %s", task, err)
+		return "" // never executed here
+	}
+
+	rc.Set(task.ID, taskBytes, time.Duration(r.TaskTTL)*time.Second)
+	rc.LPush(task.QueueName, taskBytes)
 	return task.ID
 }
