@@ -1,5 +1,8 @@
 # gotasks
 
+[![Build Status](https://travis-ci.org/jiajunhuang/gotasks.svg?branch=master)](https://travis-ci.org/jiajunhuang/gotasks)
+[![codecov](https://codecov.io/gh/jiajunhuang/gotasks/branch/master/graph/badge.svg)](https://codecov.io/gh/jiajunhuang/gotasks)
+
 gotasks is a task/job queue framework for Golang. Currently we support use Redis as broker, but you can replace it
 easily by implement `Broker` interface in `broker.go`.
 
