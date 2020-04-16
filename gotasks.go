@@ -25,6 +25,9 @@ type AckWhenStatus int
 const (
 	AckWhenAcquired AckWhenStatus = iota
 	AckWhenSucceed
+
+	// gotasks builtin queue
+	FatalQueue = "gt:queue:fatal"
 )
 
 var (
@@ -51,6 +54,10 @@ func handleTask(task *Task, queueName string) {
 			task.ResultLog = string(debug.Stack())
 			broker.Update(task)
 			log.Printf("recovered from queue %s and task %+v with recover info %+v", queueName, task, r)
+
+			// save to fatal queue
+			task.QueueName = FatalQueue
+			broker.Enqueue(task)
 		}
 	}()
 
