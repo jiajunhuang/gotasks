@@ -29,14 +29,14 @@ type AckWhenStatus int
 const (
 	AckWhenAcquired AckWhenStatus = iota
 	AckWhenSucceed
-
-	// gotasks builtin queue
-	FatalQueue = "gt:queue:fatal"
 )
 
 var (
 	jobMap  = map[string][]JobHandler{}
 	ackWhen = AckWhenSucceed
+
+	// gotasks builtin queue
+	FatalQueue = "fatal"
 
 	// prometheus
 	taskHistogram = prometheus.NewHistogramVec(prometheus.HistogramOpts{
@@ -180,6 +180,8 @@ func monitorQueue(ctx context.Context, wg *sync.WaitGroup, queueName string, int
 
 func Run(ctx context.Context, queues ...string) {
 	wg := sync.WaitGroup{}
+
+	go monitorQueue(ctx, &wg, FatalQueue, 5)
 	for _, queue := range queues {
 		go run(ctx, &wg, queue)
 		go monitorQueue(ctx, &wg, queue, 5)
