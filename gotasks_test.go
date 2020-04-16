@@ -2,6 +2,7 @@ package gotasks
 
 import (
 	"context"
+	"log"
 	"testing"
 	"time"
 
@@ -24,11 +25,11 @@ func TestGenFunctions(t *testing.T) {
 func TestRedisBroker(t *testing.T) {
 	// register tasks
 	handler1 := func(args ArgsMap) (ArgsMap, error) {
-		time.Sleep(time.Duration(1) * time.Second)
+		time.Sleep(time.Duration(1) * time.Microsecond)
 		return args, nil
 	}
 	handler2 := func(args ArgsMap) (ArgsMap, error) {
-		time.Sleep(time.Duration(1) * time.Second)
+		time.Sleep(time.Duration(1) * time.Microsecond)
 		return args, nil
 	}
 	Register(testJobName, handler1, handler2)
@@ -37,29 +38,30 @@ func TestRedisBroker(t *testing.T) {
 	UseRedisBroker(testRedisURL, 100)
 
 	// enqueue
-	Enqueue(testQueueName, testJobName, MapToArgsMap(map[string]interface{}{}))
+	log.Printf("current jobMap: %+v", jobMap)
+	taskID := Enqueue(testQueueName, testJobName, MapToArgsMap(map[string]interface{}{}))
+	defer rc.Del(genTaskName(taskID))
 
 	ctx, cancel := context.WithCancel(context.Background())
-	go func() {
-		time.Sleep(time.Second * time.Duration(1))
-		cancel()
-	}()
-	run(ctx, testQueueName) // it will blocking until the first job is executed
+	go Run(ctx, testQueueName) // it will blocking until the first job is executed
+	time.Sleep(time.Second * time.Duration(1))
+	cancel()
+	log.Printf("Run function returned, ctx: %+v", ctx)
 }
 
 func TestPanicHandler(t *testing.T) {
 	// register tasks
 	handler1 := func(args ArgsMap) (ArgsMap, error) {
-		time.Sleep(time.Duration(2) * time.Second)
+		time.Sleep(time.Duration(1) * time.Microsecond)
 		return args, nil
 	}
 	handler2 := func(args ArgsMap) (ArgsMap, error) {
-		time.Sleep(time.Duration(1) * time.Second)
+		time.Sleep(time.Duration(1) * time.Microsecond)
 		panic("whoops")
 		//return args, nil
 	}
 	handler3 := func(args ArgsMap) (ArgsMap, error) {
-		time.Sleep(time.Duration(0) * time.Second)
+		time.Sleep(time.Duration(1) * time.Microsecond)
 		return args, nil
 	}
 	Register(testPanicJobName, handler1, handler2, handler3)
@@ -68,14 +70,15 @@ func TestPanicHandler(t *testing.T) {
 	UseRedisBroker(testRedisURL, 100)
 
 	// enqueue
+	log.Printf("current jobMap: %+v", jobMap)
 	taskID := Enqueue(testQueueName, testPanicJobName, MapToArgsMap(map[string]interface{}{}))
+	defer rc.Del(genTaskName(taskID))
 
 	ctx, cancel := context.WithCancel(context.Background())
-	go func() {
-		time.Sleep(time.Second * time.Duration(1))
-		cancel()
-	}()
-	run(ctx, testQueueName) // it will blocking until the first job is executed
+	go Run(ctx, testQueueName) // it will blocking until the first job is executed
+	time.Sleep(time.Second * time.Duration(1))
+	cancel()
+	log.Printf("Run function returned, ctx: %+v", ctx)
 
 	// check result
 	taskBytes := []byte{}
@@ -105,12 +108,12 @@ func TestPanicHandler(t *testing.T) {
 func TestArgsPass(t *testing.T) {
 	// register tasks
 	handler1 := func(args ArgsMap) (ArgsMap, error) {
-		time.Sleep(time.Duration(1) * time.Second)
+		time.Sleep(time.Duration(1) * time.Microsecond)
 		args["hello"] = "world"
 		return args, nil
 	}
 	handler2 := func(args ArgsMap) (ArgsMap, error) {
-		time.Sleep(time.Duration(1) * time.Second)
+		time.Sleep(time.Duration(1) * time.Microsecond)
 		assert.Equal(t, "world", args["hello"])
 		return args, nil
 	}
@@ -120,12 +123,13 @@ func TestArgsPass(t *testing.T) {
 	UseRedisBroker(testRedisURL, 100)
 
 	// enqueue
-	Enqueue(testQueueName, testArgsPassJobName, MapToArgsMap(map[string]interface{}{}))
+	log.Printf("current jobMap: %+v", jobMap)
+	taskID := Enqueue(testQueueName, testArgsPassJobName, MapToArgsMap(map[string]interface{}{}))
+	defer rc.Del(genTaskName(taskID))
 
 	ctx, cancel := context.WithCancel(context.Background())
-	go func() {
-		time.Sleep(time.Second * time.Duration(1))
-		cancel()
-	}()
-	run(ctx, testQueueName) // it will blocking until the first job is executed
+	go Run(ctx, testQueueName) // it will blocking until the first job is executed
+	time.Sleep(time.Second * time.Duration(1))
+	cancel()
+	log.Printf("Run function returned, ctx: %+v", ctx)
 }

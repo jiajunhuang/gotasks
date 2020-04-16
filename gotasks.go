@@ -45,72 +45,77 @@ func Register(jobName string, handlers ...JobHandler) {
 	jobMap[jobName] = handlers
 }
 
-func run(ctx context.Context, queue string) {
+func handleTask(task *Task, queueName string) {
+	defer func() {
+		if r := recover(); r != nil {
+			task.ResultLog = string(debug.Stack())
+			broker.Update(task)
+			log.Printf("recovered from queue %s and task %+v with recover info %+v", queueName, task, r)
+		}
+	}()
+
+	handlers, ok := jobMap[task.JobName]
+	if !ok {
+		log.Panicf("can't find job handlers of %s", task.JobName)
+		return
+	}
+
+	var (
+		err  error
+		args = task.ArgsMap
+	)
+	for i, handler := range handlers {
+		if task.CurrentHandlerIndex > i {
+			log.Printf("skip step %d of task %s because it was executed successfully", i, task.ID)
+			continue
+		}
+
+		task.CurrentHandlerIndex = i
+		handlerName := getHandlerName(handler)
+		log.Printf("task %s is executing step %d with handler %+v", task.ID, task.CurrentHandlerIndex, handlerName)
+		reentrantOptions, ok := reentrantMap[handlerName]
+		if ok { // check if the handler can retry
+			for j := 0; j < reentrantOptions.MaxTimes; j++ {
+				args, err = handler(args)
+				if err == nil {
+					break
+				}
+				time.Sleep(time.Second * time.Duration(reentrantOptions.SleepySeconds))
+			}
+		} else {
+			args, err = handler(args)
+		}
+
+		// error occurred
+		if err != nil {
+			log.Panicf("failed to execute handler %+v: %s", handler, err)
+		}
+		task.ArgsMap = args
+		broker.Update(task)
+	}
+}
+
+func run(ctx context.Context, wg *sync.WaitGroup, queueName string) {
+	wg.Add(1)
+	defer wg.Done()
+
 	for {
 		select {
 		case <-ctx.Done():
-			log.Printf("ctx.Done() received, quit (for queue %s) now", queue)
+			log.Printf("ctx.Done() received, quit (for queue %s) now", queueName)
 			return
 		default:
-			log.Printf("gonna acquire a task from queue %s", queue)
+			log.Printf("gonna acquire a task from queue %s", queueName)
 		}
 
-		task := broker.Acquire(queue)
+		task := broker.Acquire(queueName)
 
 		if ackWhen == AckWhenAcquired {
 			ok := broker.Ack(task)
 			log.Printf("ack broker of task %+v with status %t", task.ID, ok)
 		}
 
-		func() {
-			defer func() {
-				if r := recover(); r != nil {
-					task.ResultLog = string(debug.Stack())
-					broker.Update(task)
-					log.Printf("recovered from queue %s and task %+v with recover info %+v", queue, task, r)
-				}
-			}()
-
-			handlers, ok := jobMap[task.JobName]
-			if !ok {
-				log.Panicf("can't find job handlers of %s", task.JobName)
-				return
-			}
-
-			var (
-				err  error
-				args = task.ArgsMap
-			)
-			for i, handler := range handlers {
-				if task.CurrentHandlerIndex > i {
-					log.Printf("skip step %d of task %s because it was executed successfully", i, task.ID)
-					continue
-				}
-
-				task.CurrentHandlerIndex = i
-				log.Printf("task %+v is executing step %d with handler %+v", task, task.CurrentHandlerIndex, handler)
-				handlerName := getHandlerName(handler)
-				reentrantOptions, ok := reentrantMap[handlerName]
-				if ok { // check if the handler can retry
-					for j := 0; j < reentrantOptions.MaxTimes; j++ {
-						args, err = handler(args)
-						if err == nil {
-							break
-						}
-						time.Sleep(time.Second * time.Duration(reentrantOptions.SleepySeconds))
-					}
-				} else {
-					args, err = handler(args)
-				}
-
-				// error occurred
-				if err != nil {
-					log.Panicf("failed to execute handler %+v: %s", handler, err)
-				}
-				task.ArgsMap = args
-				broker.Update(task)
-			}
-		}()
+		handleTask(task, queueName)
 
 		if ackWhen == AckWhenSucceed {
 			ok := broker.Ack(task)
@@ -119,11 +124,10 @@ func run(ctx context.Context, queue string) {
 	}
 }
 
-func Run(queues ...string) {
+func Run(ctx context.Context, queues ...string) {
 	wg := sync.WaitGroup{}
 	for _, queue := range queues {
-		wg.Add(1)
-		go run(context.Background(), queue)
+		go run(ctx, &wg, queue)
 	}
 
 	wg.Wait()
