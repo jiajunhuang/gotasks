@@ -54,6 +54,7 @@ func init() {
 	prometheus.MustRegister(taskGuage)
 }
 
+// AckWhen set when will the ack be sent to broker
 func AckWhen(i AckWhenStatus) {
 	ackWhen = i
 }
@@ -178,6 +179,7 @@ func monitorQueue(ctx context.Context, wg *sync.WaitGroup, queueName string, int
 	}
 }
 
+// Run a worker that listen on queues
 func Run(ctx context.Context, queues ...string) {
 	wg := sync.WaitGroup{}
 
@@ -190,12 +192,14 @@ func Run(ctx context.Context, queues ...string) {
 	wg.Wait()
 }
 
+// Enqueue a job(which will be wrapped in task) into queue
 func Enqueue(queueName, jobName string, argsMap ArgsMap) string {
 	taskID := broker.Enqueue(NewTask(queueName, jobName, argsMap))
 	log.Printf("job %s enqueued to %s, taskID is %s", jobName, queueName, taskID)
 	return taskID
 }
 
+// MetricsServer start a http server that print metrics in /metrics
 func MetricsServer(addr string) {
 	http.Handle("/metrics", promhttp.Handler())
 	http.ListenAndServe(addr, nil)
