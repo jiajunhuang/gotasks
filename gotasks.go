@@ -32,8 +32,11 @@ const (
 )
 
 var (
-	jobMap  = map[string][]JobHandler{}
-	ackWhen = AckWhenSucceed
+	jobMap     = map[string][]JobHandler{}
+	jobMapLock sync.RWMutex
+
+	ackWhen     = AckWhenSucceed
+	ackWhenLock sync.Mutex
 
 	// gotasks builtin queue
 	FatalQueue = "fatal"
@@ -56,10 +59,16 @@ func init() {
 
 // AckWhen set when will the ack be sent to broker
 func AckWhen(i AckWhenStatus) {
+	ackWhenLock.Lock()
+	defer ackWhenLock.Unlock()
+
 	ackWhen = i
 }
 
 func Register(jobName string, handlers ...JobHandler) {
+	jobMapLock.Lock()
+	defer jobMapLock.Unlock()
+
 	if _, ok := jobMap[jobName]; ok {
 		log.Panicf("job name %s already exist, check your code", jobName)
 		return // never executed here
@@ -90,7 +99,9 @@ func handleTask(task *Task, queueName string) {
 		}
 	}()
 
+	jobMapLock.RLock()
 	handlers, ok := jobMap[task.JobName]
+	jobMapLock.RUnlock()
 	if !ok {
 		log.Panicf("can't find job handlers of %s", task.JobName)
 		return
@@ -108,7 +119,7 @@ func handleTask(task *Task, queueName string) {
 
 		task.CurrentHandlerIndex = i
 		handlerName := getHandlerName(handler)
-		log.Printf("task %s is executing step %d with handler %+v", task.ID, task.CurrentHandlerIndex, handlerName)
+		log.Printf("task %s is executing step %d with handler %s", task.ID, task.CurrentHandlerIndex, handlerName)
 		reentrantOptions, ok := reentrantMap[handlerName]
 		if ok { // check if the handler can retry
 			for j := 0; j < reentrantOptions.MaxTimes; j++ {
@@ -125,7 +136,7 @@ func handleTask(task *Task, queueName string) {
 
 		// error occurred
 		if err != nil {
-			log.Panicf("failed to execute handler %+v: %s", handler, err)
+			log.Panicf("failed to execute handler %s: %s", handlerName, err)
 		}
 		task.ArgsMap = args
 		broker.Update(task)
@@ -133,7 +144,6 @@ func handleTask(task *Task, queueName string) {
 }
 
 func run(ctx context.Context, wg *sync.WaitGroup, queueName string) {
-	wg.Add(1)
 	defer wg.Done()
 
 	for {
@@ -162,7 +172,6 @@ func run(ctx context.Context, wg *sync.WaitGroup, queueName string) {
 }
 
 func monitorQueue(ctx context.Context, wg *sync.WaitGroup, queueName string, interval int) {
-	wg.Add(1)
 	defer wg.Done()
 
 	for {
@@ -183,8 +192,10 @@ func monitorQueue(ctx context.Context, wg *sync.WaitGroup, queueName string, int
 func Run(ctx context.Context, queues ...string) {
 	wg := sync.WaitGroup{}
 
+	wg.Add(1)
 	go monitorQueue(ctx, &wg, FatalQueue, 5)
 	for _, queue := range queues {
+		wg.Add(2)
 		go run(ctx, &wg, queue)
 		go monitorQueue(ctx, &wg, queue, 5)
 	}

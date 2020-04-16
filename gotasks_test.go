@@ -11,13 +11,20 @@ import (
 )
 
 const (
-	testJobName          = "test_job"
-	testPanicJobName     = "test_panic_job"
-	testArgsPassJobName  = "test_args_pass_job"
-	testReentrantJobName = "test_reentrant_job"
-	testQueueName        = "test_queue"
-	testRedisURL         = "redis://127.0.0.1:6379/0"
+	testJobName                = "test_job"
+	testPanicJobName           = "test_panic_job"
+	testArgsPassJobName        = "test_args_pass_job"
+	testReentrantJobName       = "test_reentrant_job"
+	testHandlerNotFoundJobName = "test_handler_not_found"
+
+	testQueueName = "test_queue"
+	testRedisURL  = "redis://127.0.0.1:6379/0"
 )
+
+func TestAckWhen(t *testing.T) {
+	AckWhen(AckWhenAcquired)
+	AckWhen(AckWhenSucceed)
+}
 
 func TestGenFunctions(t *testing.T) {
 	assert.Equal(t, "gt:task:abcd", genTaskName("abcd"))
@@ -155,6 +162,23 @@ func TestReentrant(t *testing.T) {
 	// enqueue
 	log.Printf("current jobMap: %+v", jobMap)
 	taskID := Enqueue(testQueueName, testReentrantJobName, MapToArgsMap(map[string]interface{}{}))
+	defer rc.Del(genTaskName(taskID))
+
+	ctx, cancel := context.WithCancel(context.Background())
+	go Run(ctx, testQueueName) // it will blocking until the first job is executed
+	time.Sleep(time.Second * time.Duration(1))
+	cancel()
+	log.Printf("Run function returned, ctx: %+v", ctx)
+}
+
+func TestJobHandlerNotFound(t *testing.T) {
+	// set broker
+	UseRedisBroker(testRedisURL, 100)
+
+	// enqueue
+	log.Printf("current jobMap: %+v", jobMap)
+	testQueue := NewQueue(testQueueName)
+	taskID := testQueue.Enqueue(testHandlerNotFoundJobName, MapToArgsMap(map[string]interface{}{}))
 	defer rc.Del(genTaskName(taskID))
 
 	ctx, cancel := context.WithCancel(context.Background())
