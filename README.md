@@ -60,6 +60,9 @@ func main() {
 	// queue.Enqueue(uniqueJobName, gotasks.Blablabla...)
 	gotasks.Enqueue(queueName, uniqueJobName, gotasks.MapToArgsMap(map[string]interface{}{})) // or gotasks.StructToArgsMap
 }
+
+	// or you can integrate metrics handler yourself in your own web app
+	gotasks.MetricsServer(":2121")
 ```
 
 ## License

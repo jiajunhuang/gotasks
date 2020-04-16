@@ -3,9 +3,13 @@ package gotasks
 import (
 	"context"
 	"log"
+	"net/http"
 	"runtime/debug"
 	"sync"
 	"time"
+
+	"github.com/prometheus/client_golang/prometheus"
+	"github.com/prometheus/client_golang/prometheus/promhttp"
 )
 
 // gotasks is a job/task framework for Golang.
@@ -33,7 +37,22 @@ const (
 var (
 	jobMap  = map[string][]JobHandler{}
 	ackWhen = AckWhenSucceed
+
+	// prometheus
+	taskHistogram = prometheus.NewHistogramVec(prometheus.HistogramOpts{
+		Name: "task_execution_stats",
+		Help: "task execution duration and status(success/fail)",
+	}, []string{"queue_name", "job_name", "status"})
+	taskGuage = prometheus.NewGaugeVec(prometheus.GaugeOpts{
+		Name: "task_queue_stats",
+		Help: "task stats in queue",
+	}, []string{"queue_name"})
 )
+
+func init() {
+	prometheus.MustRegister(taskHistogram)
+	prometheus.MustRegister(taskGuage)
+}
 
 func AckWhen(i AckWhenStatus) {
 	ackWhen = i
@@ -50,11 +69,20 @@ func Register(jobName string, handlers ...JobHandler) {
 
 func handleTask(task *Task, queueName string) {
 	defer func() {
-		if r := recover(); r != nil {
+		r := recover()
+		status := "success"
+
+		if r != nil {
+			status = "fail"
+
 			task.ResultLog = string(debug.Stack())
 			broker.Update(task)
 			log.Printf("recovered from queue %s and task %+v with recover info %+v", queueName, task, r)
+		}
 
+		taskHistogram.WithLabelValues(task.QueueName, task.JobName, status).Observe(task.UpdatedAt.Sub(task.CreatedAt).Seconds())
+
+		if r != nil {
 			// save to fatal queue
 			task.QueueName = FatalQueue
 			broker.Enqueue(task)
@@ -132,10 +160,29 @@ func run(ctx context.Context, wg *sync.WaitGroup, queueName string) {
 	}
 }
 
+func monitorQueue(ctx context.Context, wg *sync.WaitGroup, queueName string, interval int) {
+	wg.Add(1)
+	defer wg.Done()
+
+	for {
+		select {
+		case <-ctx.Done():
+			log.Printf("ctx.Done() received, quit (for queue %s) now", queueName)
+			return
+		default:
+			log.Printf("gonna collect metrics from queue %s", queueName)
+		}
+
+		taskGuage.WithLabelValues(queueName).Set(float64(broker.QueueLen(queueName)))
+		time.Sleep(time.Second * time.Duration(interval))
+	}
+}
+
 func Run(ctx context.Context, queues ...string) {
 	wg := sync.WaitGroup{}
 	for _, queue := range queues {
 		go run(ctx, &wg, queue)
+		go monitorQueue(ctx, &wg, queue, 5)
 	}
 
 	wg.Wait()
@@ -145,4 +192,9 @@ func Enqueue(queueName, jobName string, argsMap ArgsMap) string {
 	taskID := broker.Enqueue(NewTask(queueName, jobName, argsMap))
 	log.Printf("job %s enqueued to %s, taskID is %s", jobName, queueName, taskID)
 	return taskID
+}
+
+func MetricsServer(addr string) {
+	http.Handle("/metrics", promhttp.Handler())
+	http.ListenAndServe(addr, nil)
 }

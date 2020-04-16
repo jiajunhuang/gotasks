@@ -28,6 +28,7 @@ type Broker interface {
 	Ack(*Task) bool
 	Update(*Task)
 	Enqueue(*Task) string
+	QueueLen(string) int64
 }
 
 type RedisBroker struct {
@@ -86,4 +87,9 @@ func (r *RedisBroker) Enqueue(task *Task) string {
 	rc.Set(genTaskName(task.ID), taskBytes, time.Duration(r.TaskTTL)*time.Second)
 	rc.LPush(genQueueName(task.QueueName), taskBytes)
 	return task.ID
+}
+
+func (r *RedisBroker) QueueLen(queueName string) int64 {
+	l, _ := rc.LLen(genQueueName(queueName)).Result()
+	return l
 }
