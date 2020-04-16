@@ -8,8 +8,12 @@ import (
 type JobHandler func(ArgsMap) (ArgsMap, error)
 
 type ReentrantOptions struct {
-	MaxTimes      int
-	SleepySeconds int
+	MaxTimes int
+	SleepyMS int
+}
+
+func NewReentrantOptions(maxTimes, sleepyMS int) ReentrantOptions {
+	return ReentrantOptions{maxTimes, sleepyMS}
 }
 
 var (

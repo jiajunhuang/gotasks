@@ -2,6 +2,7 @@ package gotasks
 
 import (
 	"context"
+	"errors"
 	"log"
 	"testing"
 	"time"
@@ -10,11 +11,12 @@ import (
 )
 
 const (
-	testJobName         = "test_job"
-	testPanicJobName    = "test_panic_job"
-	testArgsPassJobName = "test_args_pass_job"
-	testQueueName       = "test_queue"
-	testRedisURL        = "redis://127.0.0.1:6379/0"
+	testJobName          = "test_job"
+	testPanicJobName     = "test_panic_job"
+	testArgsPassJobName  = "test_args_pass_job"
+	testReentrantJobName = "test_reentrant_job"
+	testQueueName        = "test_queue"
+	testRedisURL         = "redis://127.0.0.1:6379/0"
 )
 
 func TestGenFunctions(t *testing.T) {
@@ -125,6 +127,34 @@ func TestArgsPass(t *testing.T) {
 	// enqueue
 	log.Printf("current jobMap: %+v", jobMap)
 	taskID := Enqueue(testQueueName, testArgsPassJobName, MapToArgsMap(map[string]interface{}{}))
+	defer rc.Del(genTaskName(taskID))
+
+	ctx, cancel := context.WithCancel(context.Background())
+	go Run(ctx, testQueueName) // it will blocking until the first job is executed
+	time.Sleep(time.Second * time.Duration(1))
+	cancel()
+	log.Printf("Run function returned, ctx: %+v", ctx)
+}
+
+func TestReentrant(t *testing.T) {
+	// register tasks
+	handler1 := func(args ArgsMap) (ArgsMap, error) {
+		time.Sleep(time.Duration(1) * time.Microsecond)
+		args["hello"] = "world"
+		return args, nil
+	}
+	handler2 := func(args ArgsMap) (ArgsMap, error) {
+		return args, errors.New("hello world error")
+	}
+
+	Register(testReentrantJobName, handler1, Reentrant(handler2, NewReentrantOptions(3, 100)))
+
+	// set broker
+	UseRedisBroker(testRedisURL, 100)
+
+	// enqueue
+	log.Printf("current jobMap: %+v", jobMap)
+	taskID := Enqueue(testQueueName, testReentrantJobName, MapToArgsMap(map[string]interface{}{}))
 	defer rc.Del(genTaskName(taskID))
 
 	ctx, cancel := context.WithCancel(context.Background())

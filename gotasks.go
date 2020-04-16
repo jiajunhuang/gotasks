@@ -80,7 +80,8 @@ func handleTask(task *Task, queueName string) {
 				if err == nil {
 					break
 				}
-				time.Sleep(time.Second * time.Duration(reentrantOptions.SleepySeconds))
+				time.Sleep(time.Microsecond * time.Duration(reentrantOptions.SleepyMS))
+				log.Printf("retry step %d of task %s the %d rd time", task.CurrentHandlerIndex, task.ID, j)
 			}
 		} else {
 			args, err = handler(args)
