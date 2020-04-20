@@ -8,6 +8,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/jiajunhuang/gotasks/pool"
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
 )
@@ -70,31 +71,11 @@ func Register(jobName string, handlers ...JobHandler) {
 	jobMap[jobName] = handlers
 }
 
-func handleTask(task *Task, queueName string) {
-	defer func() {
-		r := recover()
-		status := "success"
-
-		if r != nil {
-			status = "fail"
-
-			task.ResultLog = string(debug.Stack())
-			broker.Update(task)
-			log.Printf("recovered from queue %s and task %+v with recover info %+v", queueName, task, r)
-		}
-
-		taskHistogram.WithLabelValues(task.QueueName, task.JobName, status).Observe(task.UpdatedAt.Sub(task.CreatedAt).Seconds())
-
-		if r != nil {
-			// save to fatal queue
-			task.QueueName = FatalQueueName
-			broker.Enqueue(task)
-		}
-	}()
-
+func runHandlers(task *Task) {
 	jobMapLock.RLock()
+	defer jobMapLock.RUnlock()
+
 	handlers, ok := jobMap[task.JobName]
-	jobMapLock.RUnlock()
 	if !ok {
 		log.Panicf("can't find job handlers of %s", task.JobName)
 		return
@@ -140,22 +121,36 @@ func handleTask(task *Task, queueName string) {
 	}
 }
 
+func handleTask(task *Task, queueName string) {
+	defer func() {
+		r := recover()
+		status := "success"
+
+		if r != nil {
+			status = "fail"
+
+			task.ResultLog = string(debug.Stack())
+			broker.Update(task)
+			log.Printf("recovered from queue %s and task %+v with recover info %+v", queueName, task, r)
+		}
+
+		taskHistogram.WithLabelValues(task.QueueName, task.JobName, status).Observe(task.UpdatedAt.Sub(task.CreatedAt).Seconds())
+
+		if r != nil {
+			// save to fatal queue
+			task.QueueName = FatalQueueName
+			broker.Enqueue(task)
+		}
+	}()
+
+	runHandlers(task)
+}
+
 func run(ctx context.Context, wg *sync.WaitGroup, queue *Queue) {
 	defer wg.Done()
 
-	// initialize concurrency chan
-	tokenChan := make(chan struct{}, queue.MaxLimit)
-	for i := 0; i < queue.MaxLimit; i++ {
-		tokenChan <- struct{}{}
-	}
-	defer func() {
-		for i := 0; i < queue.MaxLimit; i++ { // wait for all tokens
-			<-tokenChan
-		}
-		close(tokenChan)
-	}()
-
-	var token struct{}
+	gopool := pool.NewGoPool(queue.MaxLimit)
+	defer gopool.Wait()
 
 	for {
 		select {
@@ -166,23 +161,26 @@ func run(ctx context.Context, wg *sync.WaitGroup, queue *Queue) {
 			log.Printf("gonna acquire a task from queue %s", queue.Name)
 		}
 
-		token = <-tokenChan
-		task := broker.Acquire(queue.Name)
+		fn := func() {
+			task := broker.Acquire(queue.Name)
 
-		if ackWhen == AckWhenAcquired {
-			ok := broker.Ack(task)
-			log.Printf("ack broker of task %+v with status %t", task.ID, ok)
-		}
-
-		go func() {
+			if ackWhen == AckWhenAcquired {
+				ok := broker.Ack(task)
+				log.Printf("ack broker of task %+v with status %t", task.ID, ok)
+			}
 			handleTask(task, queue.Name)
-			tokenChan <- token
 
 			if ackWhen == AckWhenSucceed {
 				ok := broker.Ack(task)
 				log.Printf("ack broker of task %+v with status %t", task.ID, ok)
 			}
-		}()
+		}
+
+		if queue.Async {
+			gopool.Submit(fn)
+		} else {
+			fn()
+		}
 	}
 }
 

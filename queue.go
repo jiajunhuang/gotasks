@@ -3,6 +3,7 @@ package gotasks
 type Queue struct {
 	Name     string
 	MaxLimit int
+	Async    bool
 
 	// monitor
 	MonitorInterval int
@@ -22,8 +23,14 @@ func WithMonitorInterval(seconds int) QueueOption {
 	}
 }
 
+func WithAsyncHandleTask(async bool) QueueOption {
+	return func(q *Queue) {
+		q.Async = async
+	}
+}
+
 func NewQueue(name string, options ...QueueOption) *Queue {
-	queue := &Queue{name, 10, 5}
+	queue := &Queue{name, 10, false, 5}
 
 	for _, o := range options {
 		o(queue)
