@@ -7,6 +7,6 @@ import (
 )
 
 func TestUseBadRedisBroker(t *testing.T) {
-	assert.Panics(t, func() { UseRedisBroker("abcd", 1) })
-	assert.NotPanics(t, func() { UseRedisBroker(testRedisURL, 1) })
+	assert.Panics(t, func() { UseRedisBroker("abcd", WithRedisTaskTTL(1)) })
+	assert.NotPanics(t, func() { UseRedisBroker(testRedisURL) })
 }

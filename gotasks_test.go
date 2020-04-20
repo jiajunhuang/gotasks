@@ -44,7 +44,7 @@ func TestRedisBroker(t *testing.T) {
 	Register(testJobName, handler1, handler2)
 
 	// set broker
-	UseRedisBroker(testRedisURL, 100)
+	UseRedisBroker(testRedisURL, WithRedisTaskTTL(100))
 
 	// enqueue
 	log.Printf("current jobMap: %+v", jobMap)
@@ -77,7 +77,7 @@ func TestPanicHandler(t *testing.T) {
 	Register(testPanicJobName, handler1, handler2, handler3)
 
 	// set broker
-	UseRedisBroker(testRedisURL, 100)
+	UseRedisBroker(testRedisURL)
 
 	// enqueue
 	log.Printf("current jobMap: %+v", jobMap)
@@ -131,7 +131,7 @@ func TestArgsPass(t *testing.T) {
 	Register(testArgsPassJobName, handler1, handler2)
 
 	// set broker
-	UseRedisBroker(testRedisURL, 100)
+	UseRedisBroker(testRedisURL)
 
 	// enqueue
 	log.Printf("current jobMap: %+v", jobMap)
@@ -157,10 +157,10 @@ func TestReentrant(t *testing.T) {
 		return args, errors.New("hello world error")
 	}
 
-	Register(testReentrantJobName, handler1, Reentrant(handler2, NewReentrantOptions(3, 100)))
+	Register(testReentrantJobName, handler1, Reentrant(handler2, WithMaxTimes(3), WithSleepyMS(10)))
 
 	// set broker
-	UseRedisBroker(testRedisURL, 100)
+	UseRedisBroker(testRedisURL)
 
 	// enqueue
 	log.Printf("current jobMap: %+v", jobMap)
@@ -177,7 +177,7 @@ func TestReentrant(t *testing.T) {
 
 func TestJobHandlerNotFound(t *testing.T) {
 	// set broker
-	UseRedisBroker(testRedisURL, 100)
+	UseRedisBroker(testRedisURL)
 
 	// enqueue
 	log.Printf("current jobMap: %+v", jobMap)

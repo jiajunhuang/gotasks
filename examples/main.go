@@ -32,10 +32,10 @@ func main() {
 	}
 	// if handler1 failed, the task will stop, but if handler2 failed(return a non-nil error)
 	// handler2 will be retry 3 times, and sleep 100 ms each time
-	gotasks.Register(uniqueJobName, handler1, gotasks.Reentrant(handler2, gotasks.NewReentrantOptions(3, 100)))
+	gotasks.Register(uniqueJobName, handler1, gotasks.Reentrant(handler2, gotasks.WithMaxTimes(3), gotasks.WithSleepyMS(10)))
 
 	// set broker
-	gotasks.UseRedisBroker(redisURL, 100)
+	gotasks.UseRedisBroker(redisURL, gotasks.WithRedisTaskTTL(1000))
 
 	// enqueue
 	// or you can use a queue:

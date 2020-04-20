@@ -40,14 +40,27 @@ type RedisBroker struct {
 	TaskTTL int
 }
 
-func UseRedisBroker(redisURL string, taskTTL int) {
+type RedisBrokerOption func(rb *RedisBroker)
+
+func WithRedisTaskTTL(ttl int) RedisBrokerOption {
+	return func(rb *RedisBroker) {
+		rb.TaskTTL = ttl
+	}
+}
+
+func UseRedisBroker(redisURL string, brokerOptions ...RedisBrokerOption) {
 	options, err := redis.ParseURL(redisURL)
 	if err != nil {
 		log.Panicf("failed to parse redis URL %s: %s", redisURL, err)
 	}
 
 	rc = redis.NewClient(options)
-	broker = &RedisBroker{taskTTL}
+	rb := &RedisBroker{}
+	for _, o := range brokerOptions {
+		o(rb)
+	}
+
+	broker = rb
 }
 
 func (r *RedisBroker) Acquire(queueName string) *Task {
