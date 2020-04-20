@@ -14,8 +14,7 @@ func Execute(ctx context.Context, fn func()) error {
 			log.Printf("ctx is done for %s", err)
 			return err
 		default:
+			fn()
 		}
-
-		fn()
 	}
 }
