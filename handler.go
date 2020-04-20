@@ -30,7 +30,7 @@ func WithSleepyMS(ms int) ReentrantOption {
 
 var (
 	reentrantMap     = map[string]ReentrantOptions{}
-	reentrantMapLock sync.Mutex
+	reentrantMapLock sync.RWMutex
 )
 
 func getHandlerName(handler JobHandler) string {

@@ -120,7 +120,11 @@ func handleTask(task *Task, queueName string) {
 		task.CurrentHandlerIndex = i
 		handlerName := getHandlerName(handler)
 		log.Printf("task %s is executing step %d with handler %s", task.ID, task.CurrentHandlerIndex, handlerName)
+
+		reentrantMapLock.RLock()
 		reentrantOptions, ok := reentrantMap[handlerName]
+		reentrantMapLock.RUnlock()
+
 		if ok { // check if the handler can retry
 			for j := 0; j < reentrantOptions.MaxTimes; j++ {
 				args, err = handler(args)
@@ -147,7 +151,7 @@ func run(ctx context.Context, wg *sync.WaitGroup, queue *Queue) {
 	defer wg.Done()
 
 	// initialize concurrency chan
-	tokenChan := make(chan struct{}, queue.MaxLimit)
+	tokenChan := make(chan struct{}, queue.MaxLimit) // not real-concurrent yet
 	for i := 0; i < queue.MaxLimit; i++ {
 		tokenChan <- struct{}{}
 	}
