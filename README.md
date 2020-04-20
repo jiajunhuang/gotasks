@@ -23,10 +23,14 @@ package main
 
 import (
 	"context"
+	"log"
+	"os"
+	"os/signal"
+	"syscall"
 	"time"
 
 	"github.com/jiajunhuang/gotasks"
-	"github.com/jiajunhuang/gotasks/metrics"
+	//"github.com/jiajunhuang/gotasks/metrics"
 )
 
 const (
@@ -36,13 +40,25 @@ const (
 )
 
 func worker() {
-	ctx := context.Background()
+	// setup signal handler
+	sigChan := make(chan os.Signal, 1)
+	signal.Notify(sigChan, syscall.SIGINT)
+
+	ctx, cancel := context.WithCancel(context.Background())
+	go func() {
+		log.Printf("gonna listen on SIGINT...")
+		s := <-sigChan
+		switch s {
+		case syscall.SIGINT:
+			cancel()
+		default:
+		}
+	}()
+
 	gotasks.Run(ctx, queueName)
 }
 
 func main() {
-	go worker()
-
 	// register tasks
 	handler1 := func(args gotasks.ArgsMap) (gotasks.ArgsMap, error) {
 		time.Sleep(time.Duration(1) * time.Second)
@@ -65,7 +81,8 @@ func main() {
 	queue.Enqueue(uniqueJobName, gotasks.MapToArgsMap(map[string]interface{}{})) // or gotasks.StructToArgsMap
 
 	// or you can integrate metrics handler yourself in your own web app
-	metrics.RunServer(":2121")
+	// go metrics.RunServer(":2121")
+	worker()
 }
 ```
 
