@@ -13,13 +13,6 @@ import (
 )
 
 // gotasks is a job/task framework for Golang.
-// Usage:
-// * First, register your function in your code:
-// gotasks.Register("a_unique_job_name", job_handle_function1, job_handle_function2)
-// * Then, start worker by:
-// gotasks.Run()
-// * Last, enqueue a job:
-// gotasks.Enqueue("a_unique_job_name", gotasks.ArgsMap{"a": "b"})
 //
 // Note that job will be executed in register order, and every job handle function
 // must have a signature which match gotasks.JobHandler, which receives a ArgsMap and
