@@ -8,6 +8,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/jiajunhuang/gotasks/loop"
 	"github.com/jiajunhuang/gotasks/pool"
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
@@ -152,15 +153,7 @@ func run(ctx context.Context, wg *sync.WaitGroup, queue *Queue) {
 	gopool := pool.NewGoPool(queue.MaxLimit)
 	defer gopool.Wait()
 
-	for {
-		select {
-		case <-ctx.Done():
-			log.Printf("ctx.Done() received, quit (for queue %s) now", queue.Name)
-			return
-		default:
-			log.Printf("gonna acquire a task from queue %s", queue.Name)
-		}
-
+	loop.Execute(ctx, func() {
 		fn := func() {
 			task := broker.Acquire(queue.Name)
 
@@ -181,24 +174,16 @@ func run(ctx context.Context, wg *sync.WaitGroup, queue *Queue) {
 		} else {
 			fn()
 		}
-	}
+	})
 }
 
 func monitorQueue(ctx context.Context, wg *sync.WaitGroup, queue *Queue) {
 	defer wg.Done()
 
-	for {
-		select {
-		case <-ctx.Done():
-			log.Printf("ctx.Done() received, quit (for queue %s) now", queue.Name)
-			return
-		default:
-			log.Printf("gonna collect metrics from queue %s", queue.Name)
-		}
-
+	loop.Execute(ctx, func() {
 		taskGuage.WithLabelValues(queue.Name).Set(float64(broker.QueueLen(queue.Name)))
 		time.Sleep(time.Second * time.Duration(queue.MonitorInterval))
-	}
+	})
 }
 
 // Run a worker that listen on queues
