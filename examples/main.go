@@ -5,6 +5,7 @@ import (
 	"time"
 
 	"github.com/jiajunhuang/gotasks"
+	"github.com/jiajunhuang/gotasks/metrics"
 )
 
 const (
@@ -43,5 +44,5 @@ func main() {
 	queue.Enqueue(uniqueJobName, gotasks.MapToArgsMap(map[string]interface{}{})) // or gotasks.StructToArgsMap
 
 	// or you can integrate metrics handler yourself in your own web app
-	gotasks.MetricsServer(":2121")
+	metrics.RunServer(":2121")
 }

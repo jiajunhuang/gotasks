@@ -1,5 +1,9 @@
 package gotasks
 
+import (
+	"log"
+)
+
 type Queue struct {
 	Name     string
 	MaxLimit int
@@ -41,4 +45,11 @@ func NewQueue(name string, options ...QueueOption) *Queue {
 
 func (q *Queue) Enqueue(jobName string, argsMap ArgsMap) string {
 	return enqueue(q.Name, jobName, argsMap)
+}
+
+// enqueue a job(which will be wrapped in task) into queue
+func enqueue(queueName, jobName string, argsMap ArgsMap) string {
+	taskID := broker.Enqueue(NewTask(queueName, jobName, argsMap))
+	log.Printf("job %s enqueued to %s, taskID is %s", jobName, queueName, taskID)
+	return taskID
 }

@@ -3,7 +3,6 @@ package gotasks
 import (
 	"context"
 	"log"
-	"net/http"
 	"runtime/debug"
 	"sync"
 	"time"
@@ -11,7 +10,6 @@ import (
 	"github.com/jiajunhuang/gotasks/loop"
 	"github.com/jiajunhuang/gotasks/pool"
 	"github.com/prometheus/client_golang/prometheus"
-	"github.com/prometheus/client_golang/prometheus/promhttp"
 )
 
 // gotasks is a job/task framework for Golang.
@@ -200,17 +198,4 @@ func Run(ctx context.Context, queueNames ...string) {
 	}
 
 	wg.Wait()
-}
-
-// enqueue a job(which will be wrapped in task) into queue
-func enqueue(queueName, jobName string, argsMap ArgsMap) string {
-	taskID := broker.Enqueue(NewTask(queueName, jobName, argsMap))
-	log.Printf("job %s enqueued to %s, taskID is %s", jobName, queueName, taskID)
-	return taskID
-}
-
-// MetricsServer start a http server that print metrics in /metrics
-func MetricsServer(addr string) {
-	http.Handle("/metrics", promhttp.Handler())
-	http.ListenAndServe(addr, nil)
 }
