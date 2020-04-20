@@ -151,11 +151,16 @@ func run(ctx context.Context, wg *sync.WaitGroup, queue *Queue) {
 	defer wg.Done()
 
 	// initialize concurrency chan
-	tokenChan := make(chan struct{}, queue.MaxLimit) // not real-concurrent yet
+	tokenChan := make(chan struct{}, queue.MaxLimit)
 	for i := 0; i < queue.MaxLimit; i++ {
 		tokenChan <- struct{}{}
 	}
-	defer close(tokenChan)
+	defer func() {
+		for i := 0; i < queue.MaxLimit; i++ { // wait for all tokens
+			<-tokenChan
+		}
+		close(tokenChan)
+	}()
 
 	var token struct{}
 
@@ -176,13 +181,15 @@ func run(ctx context.Context, wg *sync.WaitGroup, queue *Queue) {
 			log.Printf("ack broker of task %+v with status %t", task.ID, ok)
 		}
 
-		handleTask(task, queue.Name)
-		tokenChan <- token
+		go func() {
+			handleTask(task, queue.Name)
+			tokenChan <- token
 
-		if ackWhen == AckWhenSucceed {
-			ok := broker.Ack(task)
-			log.Printf("ack broker of task %+v with status %t", task.ID, ok)
-		}
+			if ackWhen == AckWhenSucceed {
+				ok := broker.Ack(task)
+				log.Printf("ack broker of task %+v with status %t", task.ID, ok)
+			}
+		}()
 	}
 }
 
