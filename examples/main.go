@@ -39,9 +39,8 @@ func main() {
 
 	// enqueue
 	// or you can use a queue:
-	// queue := gotasks.NewQueue(queueName)
-	// queue.Enqueue(uniqueJobName, gotasks.Blablabla...)
-	gotasks.Enqueue(queueName, uniqueJobName, gotasks.MapToArgsMap(map[string]interface{}{})) // or gotasks.StructToArgsMap
+	queue := gotasks.NewQueue(queueName, gotasks.WithMaxLimit(10))
+	queue.Enqueue(uniqueJobName, gotasks.MapToArgsMap(map[string]interface{}{})) // or gotasks.StructToArgsMap
 
 	// or you can integrate metrics handler yourself in your own web app
 	gotasks.MetricsServer(":2121")

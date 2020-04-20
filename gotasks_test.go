@@ -48,7 +48,8 @@ func TestRedisBroker(t *testing.T) {
 
 	// enqueue
 	log.Printf("current jobMap: %+v", jobMap)
-	taskID := Enqueue(testQueueName, testJobName, MapToArgsMap(map[string]interface{}{}))
+	queue := NewQueue(testQueueName, WithMaxLimit(20), WithMonitorInterval(5))
+	taskID := queue.Enqueue(testJobName, MapToArgsMap(map[string]interface{}{}))
 	defer rc.Del(genTaskName(taskID))
 
 	ctx, cancel := context.WithCancel(context.Background())
@@ -80,7 +81,8 @@ func TestPanicHandler(t *testing.T) {
 
 	// enqueue
 	log.Printf("current jobMap: %+v", jobMap)
-	taskID := Enqueue(testQueueName, testPanicJobName, MapToArgsMap(map[string]interface{}{}))
+	queue := NewQueue(testQueueName)
+	taskID := queue.Enqueue(testPanicJobName, MapToArgsMap(map[string]interface{}{}))
 	defer rc.Del(genTaskName(taskID))
 
 	ctx, cancel := context.WithCancel(context.Background())
@@ -133,7 +135,8 @@ func TestArgsPass(t *testing.T) {
 
 	// enqueue
 	log.Printf("current jobMap: %+v", jobMap)
-	taskID := Enqueue(testQueueName, testArgsPassJobName, MapToArgsMap(map[string]interface{}{}))
+	queue := NewQueue(testQueueName)
+	taskID := queue.Enqueue(testArgsPassJobName, MapToArgsMap(map[string]interface{}{}))
 	defer rc.Del(genTaskName(taskID))
 
 	ctx, cancel := context.WithCancel(context.Background())
@@ -161,7 +164,8 @@ func TestReentrant(t *testing.T) {
 
 	// enqueue
 	log.Printf("current jobMap: %+v", jobMap)
-	taskID := Enqueue(testQueueName, testReentrantJobName, MapToArgsMap(map[string]interface{}{}))
+	queue := NewQueue(testQueueName)
+	taskID := queue.Enqueue(testReentrantJobName, MapToArgsMap(map[string]interface{}{}))
 	defer rc.Del(genTaskName(taskID))
 
 	ctx, cancel := context.WithCancel(context.Background())
@@ -177,8 +181,8 @@ func TestJobHandlerNotFound(t *testing.T) {
 
 	// enqueue
 	log.Printf("current jobMap: %+v", jobMap)
-	testQueue := NewQueue(testQueueName)
-	taskID := testQueue.Enqueue(testHandlerNotFoundJobName, MapToArgsMap(map[string]interface{}{}))
+	queue := NewQueue(testQueueName)
+	taskID := queue.Enqueue(testHandlerNotFoundJobName, MapToArgsMap(map[string]interface{}{}))
 	defer rc.Del(genTaskName(taskID))
 
 	ctx, cancel := context.WithCancel(context.Background())

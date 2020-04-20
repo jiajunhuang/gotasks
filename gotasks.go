@@ -39,7 +39,7 @@ var (
 	ackWhenLock sync.Mutex
 
 	// gotasks builtin queue
-	FatalQueue = "fatal"
+	FatalQueueName = "fatal"
 
 	// prometheus
 	taskHistogram = prometheus.NewHistogramVec(prometheus.HistogramOpts{
@@ -94,7 +94,7 @@ func handleTask(task *Task, queueName string) {
 
 		if r != nil {
 			// save to fatal queue
-			task.QueueName = FatalQueue
+			task.QueueName = FatalQueueName
 			broker.Enqueue(task)
 		}
 	}()
@@ -143,26 +143,37 @@ func handleTask(task *Task, queueName string) {
 	}
 }
 
-func run(ctx context.Context, wg *sync.WaitGroup, queueName string) {
+func run(ctx context.Context, wg *sync.WaitGroup, queue *Queue) {
 	defer wg.Done()
+
+	// initialize concurrency chan
+	tokenChan := make(chan struct{}, queue.MaxLimit)
+	for i := 0; i < queue.MaxLimit; i++ {
+		tokenChan <- struct{}{}
+	}
+	defer close(tokenChan)
+
+	var token struct{}
 
 	for {
 		select {
 		case <-ctx.Done():
-			log.Printf("ctx.Done() received, quit (for queue %s) now", queueName)
+			log.Printf("ctx.Done() received, quit (for queue %s) now", queue.Name)
 			return
 		default:
-			log.Printf("gonna acquire a task from queue %s", queueName)
+			log.Printf("gonna acquire a task from queue %s", queue.Name)
 		}
 
-		task := broker.Acquire(queueName)
+		token = <-tokenChan
+		task := broker.Acquire(queue.Name)
 
 		if ackWhen == AckWhenAcquired {
 			ok := broker.Ack(task)
 			log.Printf("ack broker of task %+v with status %t", task.ID, ok)
 		}
 
-		handleTask(task, queueName)
+		handleTask(task, queue.Name)
+		tokenChan <- token
 
 		if ackWhen == AckWhenSucceed {
 			ok := broker.Ack(task)
@@ -171,40 +182,41 @@ func run(ctx context.Context, wg *sync.WaitGroup, queueName string) {
 	}
 }
 
-func monitorQueue(ctx context.Context, wg *sync.WaitGroup, queueName string, interval int) {
+func monitorQueue(ctx context.Context, wg *sync.WaitGroup, queue *Queue) {
 	defer wg.Done()
 
 	for {
 		select {
 		case <-ctx.Done():
-			log.Printf("ctx.Done() received, quit (for queue %s) now", queueName)
+			log.Printf("ctx.Done() received, quit (for queue %s) now", queue.Name)
 			return
 		default:
-			log.Printf("gonna collect metrics from queue %s", queueName)
+			log.Printf("gonna collect metrics from queue %s", queue.Name)
 		}
 
-		taskGuage.WithLabelValues(queueName).Set(float64(broker.QueueLen(queueName)))
-		time.Sleep(time.Second * time.Duration(interval))
+		taskGuage.WithLabelValues(queue.Name).Set(float64(broker.QueueLen(queue.Name)))
+		time.Sleep(time.Second * time.Duration(queue.MonitorInterval))
 	}
 }
 
 // Run a worker that listen on queues
-func Run(ctx context.Context, queues ...string) {
+func Run(ctx context.Context, queueNames ...string) {
 	wg := sync.WaitGroup{}
 
 	wg.Add(1)
-	go monitorQueue(ctx, &wg, FatalQueue, 5)
-	for _, queue := range queues {
+	go monitorQueue(ctx, &wg, NewQueue(FatalQueueName))
+	for _, queueName := range queueNames {
 		wg.Add(2)
+		queue := NewQueue(queueName)
 		go run(ctx, &wg, queue)
-		go monitorQueue(ctx, &wg, queue, 5)
+		go monitorQueue(ctx, &wg, queue)
 	}
 
 	wg.Wait()
 }
 
-// Enqueue a job(which will be wrapped in task) into queue
-func Enqueue(queueName, jobName string, argsMap ArgsMap) string {
+// enqueue a job(which will be wrapped in task) into queue
+func enqueue(queueName, jobName string, argsMap ArgsMap) string {
 	taskID := broker.Enqueue(NewTask(queueName, jobName, argsMap))
 	log.Printf("job %s enqueued to %s, taskID is %s", jobName, queueName, taskID)
 	return taskID

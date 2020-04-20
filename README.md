@@ -10,6 +10,7 @@ In gotasks, we encourage developer to split tasks into smaller pieces(see the de
 
 - maintain tasks easily
 - split code into reentrant and un-reentrant pieces, so when reentrant part failed, framework will retry it automatically
+- concurrency control
 
 As handlers are chained, ArgsMap we give will be arguments to the first handler, and ArgsMap in it's return value will
 be arguments to the second handler. If any handler return a error, the execution chain will stop, and record where it
@@ -59,9 +60,8 @@ func main() {
 
 	// enqueue
 	// or you can use a queue:
-	// queue := gotasks.NewQueue(queueName)
-	// queue.Enqueue(uniqueJobName, gotasks.Blablabla...)
-	gotasks.Enqueue(queueName, uniqueJobName, gotasks.MapToArgsMap(map[string]interface{}{})) // or gotasks.StructToArgsMap
+	queue := gotasks.NewQueue(queueName, gotasks.WithMaxLimit(10))
+	queue.Enqueue(uniqueJobName, gotasks.MapToArgsMap(map[string]interface{}{})) // or gotasks.StructToArgsMap
 
 	// or you can integrate metrics handler yourself in your own web app
 	gotasks.MetricsServer(":2121")
