@@ -19,8 +19,8 @@ func WithMaxLimit(max int) GoPoolOption {
 	}
 }
 
-func NewGoPool(max int, options ...GoPoolOption) *GoPool {
-	p := &GoPool{MaxLimit: max}
+func NewGoPool(options ...GoPoolOption) *GoPool {
+	p := &GoPool{}
 	for _, o := range options {
 		o(p)
 	}

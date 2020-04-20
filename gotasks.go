@@ -150,7 +150,7 @@ func handleTask(task *Task, queueName string) {
 func run(ctx context.Context, wg *sync.WaitGroup, queue *Queue) {
 	defer wg.Done()
 
-	gopool := pool.NewGoPool(queue.MaxLimit)
+	gopool := pool.NewGoPool(pool.WithMaxLimit(queue.MaxLimit))
 	defer gopool.Wait()
 
 	loop.Execute(ctx, func() {
