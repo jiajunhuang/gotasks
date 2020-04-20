@@ -33,9 +33,8 @@ func (gp *GoPool) Submit(fn func()) {
 	token := <-gp.tokenChan // if there are no tokens, we'll block here
 
 	go func() {
-		defer func() { gp.tokenChan <- token }()
-
 		fn()
+		gp.tokenChan <- token
 	}()
 }
 
@@ -46,4 +45,8 @@ func (gp *GoPool) Wait() {
 	}
 
 	close(gp.tokenChan)
+}
+
+func (gp *GoPool) size() int {
+	return len(gp.tokenChan)
 }
