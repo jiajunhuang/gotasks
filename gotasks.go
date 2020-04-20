@@ -151,7 +151,7 @@ func run(ctx context.Context, wg *sync.WaitGroup, queue *Queue) {
 	gopool := pool.NewGoPool(pool.WithMaxLimit(queue.MaxLimit))
 	defer gopool.Wait()
 
-	loop.Execute(ctx, func() {
+	err := loop.Execute(ctx, func() {
 		fn := func() {
 			task := broker.Acquire(queue.Name)
 
@@ -173,15 +173,17 @@ func run(ctx context.Context, wg *sync.WaitGroup, queue *Queue) {
 			fn()
 		}
 	})
+	log.Printf("worker quit for queue %s: %s", queue.Name, err)
 }
 
 func monitorQueue(ctx context.Context, wg *sync.WaitGroup, queue *Queue) {
 	defer wg.Done()
 
-	loop.Execute(ctx, func() {
+	err := loop.Execute(ctx, func() {
 		taskGuage.WithLabelValues(queue.Name).Set(float64(broker.QueueLen(queue.Name)))
 		time.Sleep(time.Second * time.Duration(queue.MonitorInterval))
 	})
+	log.Printf("monitor quit for queue %s: %s", queue.Name, err)
 }
 
 // Run a worker that listen on queues
