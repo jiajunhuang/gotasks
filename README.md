@@ -77,7 +77,7 @@ func main() {
 
 	// enqueue
 	// or you can use a queue:
-	queue := gotasks.NewQueue(queueName, gotasks.WithMaxLimit(10))
+	queue := gotasks.NewQueue(queueName, gotasks.WithMaxLimit(10)) // max limit is max concurrency per worker, default is 10
 	queue.Enqueue(uniqueJobName, gotasks.MapToArgsMap(map[string]interface{}{})) // or gotasks.StructToArgsMap
 
 	// or you can integrate metrics handler yourself in your own web app
