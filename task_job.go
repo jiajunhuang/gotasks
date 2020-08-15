@@ -9,6 +9,7 @@ import (
 
 type ArgsMap map[string]interface{}
 
+// StructToArgsMap Convert struct to ArgsMap, e.g. am := StructToArgsMap(yourStruct)
 func StructToArgsMap(v interface{}) ArgsMap {
 	v_bytes, err := json.Marshal(v)
 	if err != nil {
@@ -23,8 +24,19 @@ func StructToArgsMap(v interface{}) ArgsMap {
 	return argsMap
 }
 
+// MapToArgsMap Convert golang map to ArgsMap, e.g. am := MapToArgsMap(yourStruct)
 func MapToArgsMap(v interface{}) ArgsMap {
 	return StructToArgsMap(v)
+}
+
+// ArgsMapToStruct Convert ArgsMap to struct, e.g. err := ArgsMapToStruct(am, &yourStruct)
+func ArgsMapToStruct(am ArgsMap, s interface{}) error {
+	v_bytes, err := json.Marshal(am)
+	if err != nil {
+		return err
+	}
+
+	return json.Unmarshal(v_bytes, s)
 }
 
 type Task struct {
