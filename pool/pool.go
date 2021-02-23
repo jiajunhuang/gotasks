@@ -33,8 +33,10 @@ func (gp *GoPool) Submit(fn func()) {
 	token := <-gp.tokenChan // if there are no tokens, we'll block here
 
 	go func() {
+		defer func() {
+			gp.tokenChan <- token
+		}()
 		fn()
-		gp.tokenChan <- token
 	}()
 }
 
