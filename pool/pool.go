@@ -1,5 +1,9 @@
 package pool
 
+import (
+	"log"
+)
+
 type GoPool struct {
 	MaxLimit int
 
@@ -35,6 +39,9 @@ func (gp *GoPool) Submit(fn func()) {
 	go func() {
 		defer func() {
 			gp.tokenChan <- token
+			if r := recover(); r != nil {
+				log.Printf("fn paniced: %s", r)
+			}
 		}()
 		fn()
 	}()
