@@ -15,3 +15,12 @@ func TestGoPool(t *testing.T) {
 
 	assert.Equal(t, 0, gopool.size())
 }
+
+func TestGoPoolWithPanicFn(t *testing.T) {
+	gopool := NewGoPool(WithMaxLimit(1))
+	for i := 0; i < 10; i++ {
+		go gopool.Submit(func() { panic("whoops") })
+	}
+
+	assert.Equal(t, 0, gopool.size())
+}
