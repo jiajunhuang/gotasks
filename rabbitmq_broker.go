@@ -8,9 +8,6 @@ import (
 
 var (
 	_ Broker = &RabbitMQBroker{}
-
-	// rm: RabbitMQ
-	rm *RabbitMQBroker
 )
 
 type RabbitMQBroker struct {
@@ -21,7 +18,8 @@ type RabbitMQBroker struct {
 
 func UseRabbitMQBroker(rabbitMQURL string) {
 	var err error
-	rm = &RabbitMQBroker{}
+	rm := &RabbitMQBroker{queueMapper: make(map[string]amqp.Queue)}
+	broker = rm
 
 	rm.conn, err = amqp.Dial(rabbitMQURL)
 	if err != nil {
@@ -48,7 +46,7 @@ func (r *RabbitMQBroker) declareQueue(queueName string) error {
 		return nil
 	}
 
-	q, err := rm.ch.QueueDeclare(
+	q, err := r.ch.QueueDeclare(
 		queueName, // name
 		true,      // durable
 		false,     // delete when unused
@@ -80,9 +78,6 @@ func (r *RabbitMQBroker) Acquire(queueName string) *Task {
 	if err != nil {
 		log.Panicf("failed to consume %s: %s", queueName, err)
 	}
-	if len(msgs) != 1 {
-		log.Panicf("queue declared received 1 msg per time, but it did not")
-	}
 
 	deliver := <-msgs
 
@@ -91,6 +86,7 @@ func (r *RabbitMQBroker) Acquire(queueName string) *Task {
 		log.Panicf("failed to get task from redis: %s", err)
 		return nil // never executed
 	}
+	task.internal = deliver
 	return &task
 }
 

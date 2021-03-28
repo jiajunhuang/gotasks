@@ -190,8 +190,8 @@ func monitorQueue(ctx context.Context, wg *sync.WaitGroup, queue *Queue) {
 func Run(ctx context.Context, queueNames ...string) {
 	wg := sync.WaitGroup{}
 
-	wg.Add(1)
-	go monitorQueue(ctx, &wg, NewQueue(FatalQueueName))
+	//wg.Add(1)
+	//go monitorQueue(ctx, &wg, NewQueue(FatalQueueName))
 	for _, queueName := range queueNames {
 		wg.Add(2)
 		queue := NewQueue(queueName)

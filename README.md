@@ -23,6 +23,7 @@ package main
 
 import (
 	"context"
+	"flag"
 	"log"
 	"os"
 	"os/signal"
@@ -36,7 +37,12 @@ import (
 const (
 	uniqueJobName = "a-unique-job-name"
 	redisURL      = "redis://127.0.0.1:6379/0"
-	queueName     = "job-queue-name"
+	rabbitMQURL   = "amqp://celery:celerypassword@127.0.0.1:5672/"
+	queueName     = "celery"
+)
+
+var (
+	asWorker = flag.Bool("asWorker", false, "run as worker?")
 )
 
 func worker() {
@@ -59,6 +65,8 @@ func worker() {
 }
 
 func main() {
+	flag.Parse()
+
 	// register tasks
 	handler1 := func(args gotasks.ArgsMap) (gotasks.ArgsMap, error) {
 		time.Sleep(time.Duration(1) * time.Second)
@@ -73,18 +81,26 @@ func main() {
 	gotasks.Register(uniqueJobName, handler1, gotasks.Reentrant(handler2, gotasks.WithMaxTimes(3), gotasks.WithSleepyMS(10)))
 
 	// set broker
-	gotasks.UseRedisBroker(redisURL, gotasks.WithRedisTaskTTL(1000))
+	gotasks.UseRabbitMQBroker("amqp://celery:celerypassword@192.168.250.4:5672/")
 
 	// enqueue
 	// or you can use a queue:
-	queue := gotasks.NewQueue(queueName, gotasks.WithMaxLimit(10)) // max limit is max concurrency per worker, default is 10
-	queue.Enqueue(uniqueJobName, gotasks.MapToArgsMap(map[string]interface{}{})) // or gotasks.StructToArgsMap
+	if !*asWorker {
+		queue := gotasks.NewQueue(queueName, gotasks.WithMaxLimit(10))
+		queue.Enqueue(uniqueJobName, gotasks.MapToArgsMap(map[string]interface{}{})) // or gotasks.StructToArgsMap
+	} else {
+		worker()
+	}
 
 	// or you can integrate metrics handler yourself in your own web app
 	// go metrics.RunServer(":2121")
-	worker()
 }
 ```
+
+## TODO
+
+- unit test case for rabbitmq
+- fix: Ctrl-C may not work(because of waitgroup)
 
 ## License
 
