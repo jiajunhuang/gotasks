@@ -97,3 +97,7 @@ func (r *RedisBroker) QueueLen(queueName string) int64 {
 	l, _ := rc.LLen(genQueueName(queueName)).Result()
 	return l
 }
+
+func (r *RedisBroker) Stop() {
+	return
+}

@@ -15,4 +15,5 @@ type Broker interface {
 	Update(*Task)
 	Enqueue(*Task) string
 	QueueLen(string) int64
+	Stop()
 }
