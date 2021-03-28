@@ -4,10 +4,6 @@ import (
 	"context"
 	"errors"
 	"flag"
-	"log"
-	"os"
-	"os/signal"
-	"syscall"
 	"time"
 
 	"github.com/jiajunhuang/gotasks"
@@ -27,20 +23,7 @@ var (
 
 func worker() {
 	// setup signal handler
-	sigChan := make(chan os.Signal, 1)
-	signal.Notify(sigChan, syscall.SIGINT)
-
-	ctx, cancel := context.WithCancel(context.Background())
-	go func() {
-		log.Printf("gonna listen on SIGINT...")
-		s := <-sigChan
-		switch s {
-		case syscall.SIGINT:
-			cancel()
-		default:
-		}
-	}()
-
+	ctx := context.Background()
 	gotasks.Run(ctx, queueName)
 }
 

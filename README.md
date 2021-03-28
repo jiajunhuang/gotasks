@@ -99,6 +99,7 @@ func main() {
 
 ## TODO
 
+- rabbit mq broker should not support update
 - unit test case for rabbitmq
 - fix: Ctrl-C may not work(because of waitgroup)
 

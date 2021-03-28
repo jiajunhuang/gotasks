@@ -130,7 +130,7 @@ func handleTask(task *Task, queueName string) {
 
 			task.ResultLog = string(debug.Stack())
 			broker.Update(task)
-			log.Printf("recovered from queue %s and task %+v with recover info %+v", queueName, task, r)
+			log.Printf("recovered from queue %s and task %s with recover info %+v", queueName, task.ID, r)
 		}
 
 		taskHistogram.WithLabelValues(task.QueueName, task.JobName, status).Observe(task.UpdatedAt.Sub(task.CreatedAt).Seconds())
