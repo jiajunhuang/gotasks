@@ -110,7 +110,10 @@ func (r *RabbitMQBroker) Ack(task *Task) bool {
 }
 
 func (r *RabbitMQBroker) Update(task *Task) {
-	log.Printf("rabbitmq does not support update payload of message!(task: %v)", task)
+	// RabbitMQ does not support update payload of message, so we can only put the Task
+	// to queue again!
+	taskID := r.Enqueue(task)
+	log.Printf("update task %s, put it into queue %s again", taskID, task.QueueName)
 }
 
 func (r *RabbitMQBroker) Enqueue(task *Task) string {
@@ -135,7 +138,13 @@ func (r *RabbitMQBroker) Enqueue(task *Task) string {
 }
 
 func (r *RabbitMQBroker) QueueLen(queueName string) int64 {
-	return 0
+	queue, err := r.ch.QueueInspect(queueName)
+	if err != nil {
+		log.Printf("failed to inspect queue %s: %s", queueName, err)
+		return 0
+	}
+
+	return int64(queue.Messages)
 }
 
 func (r *RabbitMQBroker) Stop() {
